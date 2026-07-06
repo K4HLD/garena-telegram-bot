@@ -7,7 +7,7 @@ FIXED_USER = "k4hld999"
 FIXED_PASS = "K4hld@garena99"
 GARENA_URL = "https://auth.garena.com/universal/register"
 
-TOKEN = "8627196820:AAHuvA4GYXto7B6Ku6zsUofleEgGfciTwlA" 
+TOKEN = "8627196820:AAE1MrHhz74YLnDjCzhoGkW482wyxpjS8kM" 
 SUBSCRIBERS = [7014840619,7014840619,7294246161] # حط لـ IDs ديالك هنا تفصلهم بفاصلة
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
