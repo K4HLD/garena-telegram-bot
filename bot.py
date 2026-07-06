@@ -119,7 +119,6 @@ async def handle_webhook(request):
     app = request.app['telegram_app']
     data = await request.json()
     
-    # تحويل JSON إلى Update ومعالجته
     async with app:
         update = Update.de_json(data, app.bot)
         await app.process_update(update)
@@ -137,17 +136,13 @@ def main():
 
     # 3. إعداد aiohttp server لاستقبال الطلبات
     aiohttp_app = web.Application()
-    aiohttp_app['telegram_app'] = app  # تخزين تطبيق البوت
+    aiohttp_app['telegram_app'] = app
     aiohttp_app.router.add_get('/', healthcheck)
     aiohttp_app.router.add_post('/webhook', handle_webhook)
 
     # 4. تعيين Webhook على تيليجرام
-    RENDER_URL = os.environ.get('RENDER_EXTERNAL_URL')
-    if not RENDER_URL:
-        raise ValueError("يجب تشغيل البوت على Render أو تحديد RENDER_EXTERNAL_URL")
-    webhook_url = f"https://{RENDER_URL}/webhook"
+    webhook_url = "https://garena-telegram-bot.onrender.com/webhook"
 
-    # نستخدم asyncio لتعيين الـ webhook
     loop = asyncio.get_event_loop()
     loop.run_until_complete(app.bot.set_webhook(url=webhook_url))
     print(f"✅ تم تعيين Webhook على: {webhook_url}")
