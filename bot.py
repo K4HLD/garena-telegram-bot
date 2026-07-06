@@ -9,7 +9,7 @@ FIXED_USER = "k4hld999"
 FIXED_PASS = "K4hld@garena99"
 GARENA_URL = "https://auth.garena.com/universal/register"
 
-TOKEN = "8808965113:AAGKNcrlzHdoJoixnxuNf_q24IPU_7ZTeDM"   # <-- تأكد من التوكن الجديد
+TOKEN = "8808965113:AAGKNcrlzHdoJoixnxuNf_q24IPU_7ZTeDM"
 SUBSCRIBERS = [7014840619, 7294246161]
 
 # --- Handlers ---
@@ -82,7 +82,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ).first
             if await register_btn.count() > 0:
                 await register_btn.click(force=True)
-                # انتظار ظهور زر إرسال الرمز
                 await page.wait_for_selector(
                     "button:has-text('GET CODE'), button:has-text('Send Code'), button:has-text('أرسل الرمز'), button:has-text('إرسال الرمز')",
                     timeout=20000
@@ -115,6 +114,18 @@ async def healthcheck(request):
     """مسار فحص الصحة لـ Render"""
     return web.Response(text="⚡ System Active")
 
+async def handle_webhook(request):
+    """معالج Webhook يدوياً"""
+    app = request.app['telegram_app']
+    data = await request.json()
+    
+    # تحويل JSON إلى Update ومعالجته
+    async with app:
+        update = Update.de_json(data, app.bot)
+        await app.process_update(update)
+    
+    return web.Response(text="OK")
+
 def main():
     # 1. إنشاء التطبيق
     app = Application.builder().token(TOKEN).build()
@@ -126,18 +137,17 @@ def main():
 
     # 3. إعداد aiohttp server لاستقبال الطلبات
     aiohttp_app = web.Application()
-    aiohttp_app.router.add_get('/', healthcheck)      # لفحص الصحة
-    # استخدام create_webhook_handler للحصول على handler متوافق مع aiohttp
-    webhook_handler = app.create_webhook_handler()
-    aiohttp_app.router.add_post('/webhook', webhook_handler)
+    aiohttp_app['telegram_app'] = app  # تخزين تطبيق البوت
+    aiohttp_app.router.add_get('/', healthcheck)
+    aiohttp_app.router.add_post('/webhook', handle_webhook)
 
     # 4. تعيين Webhook على تيليجرام
-    RENDER_URL = os.environ.get('RENDER_EXTERNAL_URL')  # Render يوفره تلقائياً
+    RENDER_URL = os.environ.get('RENDER_EXTERNAL_URL')
     if not RENDER_URL:
         raise ValueError("يجب تشغيل البوت على Render أو تحديد RENDER_EXTERNAL_URL")
     webhook_url = f"https://{RENDER_URL}/webhook"
 
-    # نستخدم asyncio لتعيين الـ webhook قبل تشغيل الخادم
+    # نستخدم asyncio لتعيين الـ webhook
     loop = asyncio.get_event_loop()
     loop.run_until_complete(app.bot.set_webhook(url=webhook_url))
     print(f"✅ تم تعيين Webhook على: {webhook_url}")
