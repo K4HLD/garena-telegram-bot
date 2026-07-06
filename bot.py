@@ -1,4 +1,6 @@
+import os
 import asyncio
+from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from playwright.async_api import async_playwright
@@ -7,9 +9,10 @@ FIXED_USER = "k4hld999"
 FIXED_PASS = "K4hld@garena99"
 GARENA_URL = "https://auth.garena.com/universal/register"
 
-TOKEN = "8945516042:AAHe4SVs3AXI-pUR1EKH90UuN5gE9VzGxIQ"
+TOKEN = "8808965113:AAGKNcrlzHdoJoixnxuNf_q24IPU_7ZTeDM"   # <-- تأكد من التوكن الجديد
 SUBSCRIBERS = [7014840619, 7294246161]
 
+# --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in SUBSCRIBERS:
@@ -65,7 +68,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await page.goto(GARENA_URL, timeout=90000, wait_until="load")
             await asyncio.sleep(4)
 
-            # 1. ملء الخانات الأربعة
+            # 1. ملء الخانات
             inputs = await page.query_selector_all("input")
             if len(inputs) >= 4:
                 await inputs[0].fill(FIXED_USER)
@@ -73,21 +76,20 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await inputs[2].fill(FIXED_PASS)
                 await inputs[3].fill(gmail)
 
-            # 2. الضغط على زر "سجل الآن" لظهور زر إرسال الرمز
-            # نبحث عن أزرار التسجيل بعدة لغات
+            # 2. الضغط على زر التسجيل
             register_btn = page.locator(
                 "button:has-text('سجل الآن'), button:has-text('Register Now'), button:has-text('Sign Up'), button:has-text('تسجيل')"
             ).first
             if await register_btn.count() > 0:
                 await register_btn.click(force=True)
-                # ننتظر حتى يظهر زر إرسال الرمز
+                # انتظار ظهور زر إرسال الرمز
                 await page.wait_for_selector(
                     "button:has-text('GET CODE'), button:has-text('Send Code'), button:has-text('أرسل الرمز'), button:has-text('إرسال الرمز')",
                     timeout=20000
                 )
-                await asyncio.sleep(2)  # زيادة تأخير بسيط للتأكيد
+                await asyncio.sleep(2)
 
-            # 3. الضغط على زر إرسال الرمز
+            # 3. الضغط على إرسال الرمز
             get_code_button = page.locator(
                 "button:has-text('GET CODE'), button:has-text('Send Code'), button:has-text('أرسل الرمز'), button:has-text('إرسال الرمز')"
             ).first
@@ -108,22 +110,41 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Error details: {e}")
         await query.message.reply_text("❌ عذراً، حدث ضغط على السيرفر. يرجى المحاولة مرة أخرى بعد دقيقة.")
 
-def main():
-    from flask import Flask
-    import threading
-    app_flask = Flask('')
-    @app_flask.route('/')
-    def home():
-        return "⚡ System Active"
-    def run():
-        app_flask.run(host='0.0.0.0', port=7860)
-    threading.Thread(target=run).start()
+# --- إعداد Webhook وبدء الخادم ---
+async def healthcheck(request):
+    """مسار فحص الصحة لـ Render"""
+    return web.Response(text="⚡ System Active")
 
+def main():
+    # 1. إنشاء التطبيق
     app = Application.builder().token(TOKEN).build()
+
+    # 2. إضافة handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gmail))
     app.add_handler(CallbackQueryHandler(button_click))
-    app.run_polling(close_loop=False, drop_pending_updates=True)
+
+    # 3. إعداد aiohttp server لاستقبال الطلبات
+    aiohttp_app = web.Application()
+    aiohttp_app.router.add_get('/', healthcheck)      # لفحص الصحة
+    # استخدام create_webhook_handler للحصول على handler متوافق مع aiohttp
+    webhook_handler = app.create_webhook_handler()
+    aiohttp_app.router.add_post('/webhook', webhook_handler)
+
+    # 4. تعيين Webhook على تيليجرام
+    RENDER_URL = os.environ.get('RENDER_EXTERNAL_URL')  # Render يوفره تلقائياً
+    if not RENDER_URL:
+        raise ValueError("يجب تشغيل البوت على Render أو تحديد RENDER_EXTERNAL_URL")
+    webhook_url = f"https://{RENDER_URL}/webhook"
+
+    # نستخدم asyncio لتعيين الـ webhook قبل تشغيل الخادم
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(app.bot.set_webhook(url=webhook_url))
+    print(f"✅ تم تعيين Webhook على: {webhook_url}")
+
+    # 5. تشغيل الخادم
+    port = int(os.environ.get('PORT', 10000))
+    web.run_app(aiohttp_app, host='0.0.0.0', port=port)
 
 if __name__ == "__main__":
     main()
