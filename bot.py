@@ -7,7 +7,7 @@ FIXED_USER = "k4hld999"
 FIXED_PASS = "K4hld@garena99"
 GARENA_URL = "https://auth.garena.com/universal/register"
 
-TOKEN = "8261178120:AAEpc7OXmXz9qQFKTn8u2Lvuq2I-UAsZa8Y"
+TOKEN = "8945516042:AAHe4SVs3AXI-pUR1EKH90UuN5gE9VzGxIQ"
 SUBSCRIBERS = [7014840619, 7294246161]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
