@@ -8,14 +8,14 @@ FIXED_PASS = "K4hld@garena99"
 GARENA_URL = "https://auth.garena.com/universal/register"
 
 TOKEN = "8627196820:AAEnVeL2zFhapb-1AU70ENSDUoa6Od7xgXg" 
-SUBSCRIBERS = [8627196820, 7014840619]
+SUBSCRIBERS = [7014840619,7014840619] # حط لـ IDs ديالك هنا تفصلهم بفاصلة
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in SUBSCRIBERS:
-        await update.message.reply_text(f"❌ هاد البوت مدفوع وخاص بتفعيل سيرفر استعادة فري فاير.\nالـ ID الخاص بك: `{user_id}`", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ هذا البوت مدفوع يرجى التواصل مع المطور لتفعيل اشتراكك@k4h_d وخاص بتفعيل سيرفر استعادة فري فاير.\nالـ ID الخاص بك: `{user_id}`", parse_mode="Markdown")
         return
-    await update.message.reply_text("✅ حسابك مفعل. أرسل الآن بريد الاستعادة (Gmail) لي فيه المشكل.")
+    await update.message.reply_text("✅ حسابك مفعل. أرسل الآن بريد الاستعادة Gmail لي فيه المشكل *البريد فقط بدون كلمة سر.")
 
 async def handle_gmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -50,34 +50,40 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with async_playwright() as p:
+            # زيادة سرعة المتصفح وتجاوز الحماية
             browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"])
             page = await browser.new_page()
             await page.set_viewport_size({"width": 1280, "height": 720})
             
-            await page.goto(GARENA_URL, timeout=60000)
-            await page.wait_for_load_state("networkidle")
+            # زيادة وقت الانتظار لـ 90 ثانية ليتناسب مع سرعة سيرفر Render
+            await page.goto(GARENA_URL, timeout=90000, wait_until="load")
+            await asyncio.sleep(3)
 
             inputs = await page.query_selector_all("input")
-            await inputs[0].fill(FIXED_USER)
-            await inputs[1].fill(FIXED_PASS)
-            await inputs[2].fill(FIXED_PASS)
-            await inputs[3].fill(gmail)
+            if len(inputs) >= 4:
+                await inputs[0].fill(FIXED_USER)
+                await inputs[1].fill(FIXED_PASS)
+                await inputs[2].fill(FIXED_PASS)
+                await inputs[3].fill(gmail)
             
-            get_code_button = page.locator("text=GET CODE").or_(page.locator("button:has-text('GET CODE')")).first
-            await get_code_button.click()
+            # محاولة كليك بأكثر من طريقة للتأكد من الضغط على الزر
+            get_code_button = page.locator("button:has-text('GET CODE')").first
+            await get_code_button.wait_for(state="visible", timeout=15000)
+            await get_code_button.click(force=True)
+            
             await asyncio.sleep(5)
             await browser.close()
             
             success_text = (
                 "✅ **تمت العملية بنجاح!**\n\n"
-                "تم تفعيل السيرفر وإرسال الرمز بنجاح. تفقد علامة التبويب (البريد الوارد أو المهملات Spams) في الـ Gmail الخاص بك الآن، وستجد الرمز شغالاً."
+                "تم تفعيل السيرفر وإرسال الرمز بنجاح. تفقد  (البريد الوارد أو المهملات Spams) في الـ Gmail الخاص بك الآن، وستجد الرمز حطه مكان الرمز في اللعبة واعمل تحقق مباشرة بدون الضغط على ارسال ❌."
             )
             await query.message.reply_text(success_text, parse_mode="Markdown")
     except Exception as e:
+        print(f"Error details: {e}") # غايبان هاد الخطأ فلوكس ديال روندر لعرفنا السبب بالظبط
         await query.message.reply_text("❌ عذراً، حدث ضغط على السيرفر. يرجى المحاولة مرة أخرى بعد دقيقة.")
 
 def main():
-    # كود الـ Flask الأساسي لمنع توقف السيرفر المجاني
     from flask import Flask
     import threading
     app_flask = Flask('')
@@ -86,16 +92,13 @@ def main():
     def run(): app_flask.run(host='0.0.0.0', port=7860)
     threading.Thread(target=run).start()
 
-    # إنشاء التطبيق بالطريقة الرسمية والمستقرة
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gmail))
     app.add_handler(CallbackQueryHandler(button_click))
     
-    # تشغيل البوت مع إعدادات حماية مدمجة ضد انقطاع الشبكة
     app.run_polling(close_loop=False, drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
-  
