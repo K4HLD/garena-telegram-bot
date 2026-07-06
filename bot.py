@@ -7,13 +7,14 @@ FIXED_USER = "k4hld999"
 FIXED_PASS = "K4hld@garena99"
 GARENA_URL = "https://auth.garena.com/universal/register"
 
+# التوكن الجديد والمشتركين المفعلين
 TOKEN = "8627196820:AAE1MrHhz74YLnDjCzhoGkW482wyxpjS8kM" 
-SUBSCRIBERS = [7014840619,7014840619,7294246161] # حط لـ IDs ديالك هنا تفصلهم بفاصلة
+SUBSCRIBERS = [7014840619, 7294246161] 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in SUBSCRIBERS:
-        await update.message.reply_text(f"❌ هذا البوت مدفوع يرجى التواصل مع المطور لتفعيل اشتراكك@k4h_d وخاص بتفعيل سيرفر استعادة فري فاير.\nالـ ID الخاص بك: `{user_id}`", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ هذا البوت مدفوع يرجى التواصل مع المطور لتفعيل اشتراكك @k4h_d وخاص بتفعيل سيرفر استعادة فري فاير.\nالـ ID الخاص بك: `{user_id}`", parse_mode="Markdown")
         return
     await update.message.reply_text("✅ حسابك مفعل. أرسل الآن بريد الاستعادة Gmail لي فيه المشكل *البريد فقط بدون كلمة سر.")
 
@@ -50,15 +51,14 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with async_playwright() as p:
-            # زيادة سرعة المتصفح وتجاوز الحماية
             browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"])
             page = await browser.new_page()
             await page.set_viewport_size({"width": 1280, "height": 720})
             
-            # زيادة وقت الانتظار لـ 90 ثانية ليتناسب مع سرعة سيرفر Render
             await page.goto(GARENA_URL, timeout=90000, wait_until="load")
-            await asyncio.sleep(3)
+            await asyncio.sleep(4)
 
+            # 1. تعبئة الحقول أولاً
             inputs = await page.query_selector_all("input")
             if len(inputs) >= 4:
                 await inputs[0].fill(FIXED_USER)
@@ -66,8 +66,14 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await inputs[2].fill(FIXED_PASS)
                 await inputs[3].fill(gmail)
             
-            # محاولة كليك بأكثر من طريقة للتأكد من الضغط على الزر
-            get_code_button = page.locator("button:has-text('GET CODE')").first
+            # 2. الضغط على زر "سجل الآن" أو "Register Now" لإظهار خانة الكود
+            register_btn = page.locator("text=سجل الآن").or_(page.locator("text=Register Now")).or_(page.locator(".register-btn")).first
+            if await register_btn.count() > 0:
+                await register_btn.click(force=True)
+                await asyncio.sleep(4) # انتظار استجابة الصفحة وظهور الكود
+
+            # 3. الضغط على زر الحصول على الرمز (GET CODE)
+            get_code_button = page.locator("button:has-text('GET CODE')").or_(page.locator("text=GET CODE")).first
             await get_code_button.wait_for(state="visible", timeout=15000)
             await get_code_button.click(force=True)
             
@@ -76,11 +82,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             success_text = (
                 "✅ **تمت العملية بنجاح!**\n\n"
-                "تم تفعيل السيرفر وإرسال الرمز بنجاح. تفقد  (البريد الوارد أو المهملات Spams) في الـ Gmail الخاص بك الآن، وستجد الرمز حطه مكان الرمز في اللعبة واعمل تحقق مباشرة بدون الضغط على ارسال ❌."
+                "تم تفعيل السيرفر وإرسال الرمز بنجاح. تفقد (البريد الوارد أو المهملات Spams) في الـ Gmail الخاص بك الآن، وستجد الرمز حطه مكان الرمز في اللعبة واعمل تحقق مباشرة بدون الضغط على ارسال ❌."
             )
             await query.message.reply_text(success_text, parse_mode="Markdown")
     except Exception as e:
-        print(f"Error details: {e}") # غايبان هاد الخطأ فلوكس ديال روندر لعرفنا السبب بالظبط
+        print(f"Error details: {e}") 
         await query.message.reply_text("❌ عذراً، حدث ضغط على السيرفر. يرجى المحاولة مرة أخرى بعد دقيقة.")
 
 def main():
